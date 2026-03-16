@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIPropria — A racing shell for the AI Economy</title>
+<style>
+
+  /* ─── RESET ───────────────────────────────────────────── */
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* ─── TOKENS ──────────────────────────────────────────── */
+  :root {
+    --bg:        #eae8e3;
+    --ink:       #111111;
+    --ink-mid:   #555555;
+    --ink-dim:   #999999;
+    --rule:      1px solid #111111;
+    --font:      "Helvetica Neue", Helvetica, "Nimbus Sans L", Arial, sans-serif;
+
+    /* Left column width — shared between header offset and left-zone */
+    --left-col:   clamp(130px, 18vw, 230px);
+    /* Gap: all content from its vertical line — unified */
+    --acc-pad:    clamp(26px, 3.2vw, 42px);
+    --hdr-gap:    clamp(26px, 3.2vw, 42px);
+    /* Number size: BIG */
+    --num-size:   clamp(260px, 44vw, 520px);
+    /* Page horizontal padding */
+    --h-pad:     clamp(24px, 4vw, 56px);
+  }
+
+  /* ─── BASE ────────────────────────────────────────────── */
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  /* ─── PAGE SHELL ──────────────────────────────────────── */
+  .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 var(--h-pad);
+  }
+
+  /* ─── IRIS ────────────────────────────────────────────── */
+  /* Single beat, unhurried. Page opens like a lens.          */
+  .wrap {
+    width: 100%;
+    max-width: 780px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    clip-path: circle(0% at 50% 50%);
+    animation: irisOpen 1.6s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+    will-change: clip-path;
+  }
+
+  @keyframes irisOpen {
+    from { clip-path: circle(0%   at 50% 50%); }
+    to   { clip-path: circle(150% at 50% 50%); }
+  }
+
+  /* ─── HEADER ──────────────────────────────────────────── */
+  /* Same three-column geometry as .stage so the pipe
+     sits at the exact same x-position as the v-rule below. */
+  header {
+    display: flex;
+    align-items: center;
+    padding: 56px 0 30px;
+    flex-shrink: 0;
+  }
+
+  /* Left zone mirror — same width as .left-zone */
+  .header-left {
+    width: var(--left-col);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: var(--hdr-gap);
+  }
+
+  .logo {
+    font-size: clamp(16px, 1.8vw, 20px);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  /* 1px pipe — mirrors v-rule exactly */
+  .h-rule {
+    width: 1px;
+    height: 28px;
+    background: var(--ink);
+    flex-shrink: 0;
+  }
+
+  .tagline {
+    font-size: clamp(16px, 1.8vw, 20px);
+    font-weight: 300;
+    letter-spacing: 0.015em;
+    color: var(--ink-mid);
+    padding-left: var(--hdr-gap);
+  }
+
+  /* ─── MAIN ────────────────────────────────────────────── */
+  main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 8px 0 56px;
+  }
+
+  .stage {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    min-height: clamp(300px, 52vh, 520px);
+    padding: 48px 0;   /* extends v-rule above and below the accordion */
+  }
+
+  /* ─── LEFT ZONE ───────────────────────────────────────── */
+  /* clip-path clips only the RIGHT edge at the v-rule boundary.
+     Negative inset on top/left/bottom allows the number to bleed
+     freely — no top or bottom cropping.                      */
+  .left-zone {
+    width: var(--left-col);
+    flex-shrink: 0;
+    position: relative;
+    clip-path: inset(-100% 0 -100% -100%);
+  }
+
+  /* ─── VERTICAL RULE ───────────────────────────────────── */
+  .v-rule {
+    width: 1px;
+    background: var(--ink);
+    flex-shrink: 0;
+    align-self: stretch;
+    min-height: clamp(380px, 55vh, 560px);
+  }
+
+  /* ─── NUMBER CHARACTER ────────────────────────────────── */
+  /* right: 0 anchors the right edge to the v-rule.
+     overflow: hidden on left-zone clips BOTH sides.
+     Sliding RIGHT pushes the number behind the v-rule (right clip).
+     Sliding LEFT reveals more of the number from the left.          */
+  .num-char {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    font-size: var(--num-size);
+    font-weight: 700;
+    line-height: 0.82;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    user-select: none;
+    white-space: nowrap;
+
+    /* Resting: shifted right so ~35% hides behind v-rule (right clip) */
+    transform: translate(35%, -50%);
+    opacity: 1;
+    transition:
+      transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      opacity   0.25s ease;
+    will-change: transform, opacity;
+  }
+
+  /* EXIT: slides LEFT → disappears past left clip boundary */
+  .num-char.exiting {
+    transform: translate(-80%, -50%);
+    opacity: 0;
+    transition:
+      transform 0.5s cubic-bezier(0.55, 0, 1, 0.45),
+      opacity   0.2s ease;
+  }
+
+  /* ENTER SNAP: start far right, then slides left to resting position */
+  .num-char.entering {
+    transform: translate(100%, -50%);
+    opacity: 0;
+    transition: none;
+  }
+
+  /* ─── ACCORDION AREA ──────────────────────────────────── */
+  .acc-wrap {
+    flex: 1;
+    padding-left: var(--acc-pad);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  /* Coxswain label */
+  .cox-label {
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 30px;
+  }
+
+  /* ─── ACCORDION ───────────────────────────────────────── */
+  .acc-list { list-style: none; }
+
+  .acc-item { border-top: var(--rule); }
+
+  .acc-item:last-child { border-bottom: var(--rule); }
+
+  .acc-row {
+    display: flex;
+    align-items: center;
+    padding: 20px 0;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .acc-row:hover .acc-title { opacity: 0.45; }
+
+  .acc-seq {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    width: 36px;
+    flex-shrink: 0;
+  }
+
+  .acc-title {
+    flex: 1;
+    font-size: clamp(16px, 1.8vw, 20px);
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    transition: opacity 0.2s ease;
+  }
+
+  .acc-plus {
+    font-size: 18px;
+    font-weight: 300;
+    color: var(--ink-mid);
+    margin-left: 24px;
+    flex-shrink: 0;
+    transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    line-height: 1;
+  }
+
+  .acc-item.open .acc-plus { transform: rotate(45deg); }
+
+  /* Body expand */
+  .acc-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .acc-item.open .acc-body { grid-template-rows: 1fr; }
+
+  .acc-inner { overflow: hidden; }
+
+  .acc-text {
+    padding: 4px 0 26px 36px;
+    font-size: 14px;
+    font-weight: 300;
+    line-height: 1.8;
+    color: var(--ink-mid);
+    max-width: 540px;
+    letter-spacing: 0.01em;
+  }
+
+  /* ─── FOOTER ──────────────────────────────────────────── */
+  footer {
+    border-top: var(--rule);
+    padding: 18px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    min-height: 56px;
+  }
+
+  .footer-copy {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--ink-dim);
+  }
+
+  .footer-right {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+  }
+
+  .footer-right a {
+    color: var(--ink-dim);
+    text-decoration: none;
+    letter-spacing: 0.08em;
+    transition: color 0.2s ease;
+  }
+
+  .footer-right a:hover {
+    color: var(--ink);
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ─── PAGE ───────────────────────────────────────────── -->
+<div class="page">
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-left">
+      <span class="logo">AIPropria</span>
+    </div>
+    <div class="h-rule" aria-hidden="true"></div>
+    <span class="tagline">A racing shell for the AI Economy.</span>
+  </header>
+
+  <!-- MAIN -->
+  <main>
+    <div class="stage">
+
+      <!-- Left zone: oversized number, cropped by overflow hidden -->
+      <div class="left-zone" aria-hidden="true">
+        <span class="num-char" id="numChar">A</span>
+      </div>
+
+      <!-- Vertical rule -->
+      <div class="v-rule" aria-hidden="true"></div>
+
+      <!-- Accordion -->
+      <div class="acc-wrap">
+
+        <p class="cox-label">The Coxswain</p>
+
+        <ul class="acc-list">
+
+          <li class="acc-item" data-digit="1">
+            <div class="acc-row" role="button" tabindex="0" aria-expanded="false">
+              <span class="acc-seq">01</span>
+              <span class="acc-title">AI Frontier Onboarding</span>
+              <span class="acc-plus" aria-hidden="true">+</span>
+            </div>
+            <div class="acc-body">
+              <div class="acc-inner">
+                <p class="acc-text">
+                  Aligning artificial intelligence with business reality.
+                  We guide organisations through the transition from AI curiosity to AI competency —
+                  mapping existing workflows, identifying leverage points, and building internal
+                  capability that compounds over time. No pilot purgatory. Real operational shift.
+                </p>
+              </div>
+            </div>
+          </li>
+
+          <li class="acc-item" data-digit="2">
+            <div class="acc-row" role="button" tabindex="0" aria-expanded="false">
+              <span class="acc-seq">02</span>
+              <span class="acc-title">Creative Services</span>
+              <span class="acc-plus" aria-hidden="true">+</span>
+            </div>
+            <div class="acc-body">
+              <div class="acc-inner">
+                <p class="acc-text">
+                  Branding · Visuals · Web Development.
+                  Identity systems built for the velocity of AI-assisted production.
+                  From brand architecture to digital presence — designed with typographic discipline
+                  and executed with machine-assisted precision.
+                </p>
+              </div>
+            </div>
+          </li>
+
+          <li class="acc-item" data-digit="3">
+            <div class="acc-row" role="button" tabindex="0" aria-expanded="false">
+              <span class="acc-seq">03</span>
+              <span class="acc-title">AI Systems</span>
+              <span class="acc-plus" aria-hidden="true">+</span>
+            </div>
+            <div class="acc-body">
+              <div class="acc-inner">
+                <p class="acc-text">
+                  Moving from human bandwidth to infinite bandwidth.
+                  We design and deploy autonomous agent architectures — workflows that run continuously,
+                  make decisions within defined parameters, and scale output without scaling headcount.
+                  The shift from doing to governing.
+                </p>
+              </div>
+            </div>
+          </li>
+
+        </ul>
+      </div><!-- /acc-wrap -->
+
+    </div><!-- /stage -->
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <span class="footer-copy">©2026 AIPropria</span>
+    <div class="footer-right">
+      <span>Enquiries&nbsp;&nbsp;+30 6978 180001</span>
+      <a href="https://www.linkedin.com/in/ygakis/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </footer>
+
+</div><!-- /wrap -->
+</div><!-- /page -->
+
+<script>
+  "use strict";
+
+  const items   = document.querySelectorAll('.acc-item');
+  const numChar = document.getElementById('numChar');
+  let   current = null; // currently open item or null
+
+  function swapNumber(newDigit) {
+    // 1. Exit current number
+    numChar.classList.add('exiting');
+
+    setTimeout(() => {
+      // 2. Snap to bottom (off-screen), update text
+      numChar.classList.remove('exiting');
+      numChar.classList.add('entering');
+      numChar.textContent = newDigit;
+
+      // Force a reflow so the 'entering' snap takes effect
+      void numChar.offsetWidth;
+
+      // 3. Slide in to resting position
+      numChar.classList.remove('entering');
+      // The default CSS transition kicks in, animating to translateY(28%)
+    }, 280);
+  }
+
+  function resetNumber() {
+    numChar.classList.add('exiting');
+    setTimeout(() => {
+      numChar.classList.remove('exiting');
+      numChar.classList.add('entering');
+      numChar.textContent = 'A';
+      void numChar.offsetWidth;
+      numChar.classList.remove('entering');
+    }, 280);
+  }
+
+  items.forEach(item => {
+    const row   = item.querySelector('.acc-row');
+    const digit = item.dataset.digit;
+
+    function toggle() {
+      const isOpen = item.classList.contains('open');
+
+      // Close all
+      items.forEach(i => {
+        i.classList.remove('open');
+        i.querySelector('.acc-row').setAttribute('aria-expanded', 'false');
+      });
+
+      if (!isOpen) {
+        item.classList.add('open');
+        row.setAttribute('aria-expanded', 'true');
+        current = item;
+        swapNumber(digit);
+      } else {
+        current = null;
+        resetNumber();
+      }
+    }
+
+    row.addEventListener('click', toggle);
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
